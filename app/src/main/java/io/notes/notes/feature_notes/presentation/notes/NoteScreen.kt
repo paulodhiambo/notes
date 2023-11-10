@@ -1,0 +1,146 @@
+package io.notes.notes.feature_notes.presentation.notes
+
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Sort
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.navigation.NavController
+import io.notes.notes.feature_notes.presentation.notes.components.NoteItem
+import io.notes.notes.feature_notes.presentation.notes.components.OrderSection
+import io.notes.notes.feature_notes.presentation.notes.events.NoteEvent
+import io.notes.notes.feature_notes.presentation.notes.viewmodel.NotesViewModel
+import io.notes.notes.feature_notes.presentation.util.Screen
+import kotlinx.coroutines.launch
+
+@Composable
+fun NoteScreen(
+    navController: NavController,
+    notesViewModel: NotesViewModel = hiltViewModel()
+) {
+    val state = notesViewModel.state.value
+    val coroutineScope = rememberCoroutineScope()
+    val snackbarHostState = remember { SnackbarHostState() }
+
+
+    Scaffold(
+        floatingActionButton = {
+            FloatingActionButton(
+                onClick = {
+                    navController.navigate(Screen.AddEditNoteScreen.route)
+                },
+                containerColor = MaterialTheme.colorScheme.primary
+            ) {
+                Icon(imageVector = Icons.Default.Add, contentDescription = "Add note")
+            }
+        },
+        snackbarHost = {
+            SnackbarHost(hostState = snackbarHostState)
+        }
+    ) { paddingValues ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+                .padding(16.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Your notes",
+                    style = MaterialTheme.typography.headlineMedium
+                )
+
+                IconButton(onClick = {
+                    notesViewModel.onEvent(NoteEvent.ToggleOrderSection)
+                }) {
+                    Icon(imageVector = Icons.Default.Sort, contentDescription = "Sort notes")
+                }
+            }
+
+            AnimatedVisibility(
+                visible = state.isOrderSectionVisible,
+                enter = fadeIn() + slideInVertically(),
+                exit = fadeOut() + slideOutVertically()
+            ) {
+                OrderSection(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 16.dp),
+                    noteOrder = state.noteOrder,
+                    onOrderChange = {
+                        notesViewModel.onEvent(NoteEvent.Order(it))
+                    }
+                )
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            LazyColumn(modifier = Modifier.fillMaxSize()) {
+                items(state.notes) { note ->
+                    NoteItem(
+                        note = note,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                navController.navigate(Screen.AddEditNoteScreen.route + "?noteId=${note.id}&noteColor=${note.color}")
+                            },
+                        onDelete = {
+                            notesViewModel.onEvent(NoteEvent.DeleteNote(note))
+                            coroutineScope.launch {
+                                val result = snackbarHostState
+                                    .showSnackbar(
+                                        message = "Note Deleted",
+                                        actionLabel = "Undo",
+                                        duration = SnackbarDuration.Indefinite
+                                    )
+                                when (result) {
+                                    SnackbarResult.ActionPerformed -> {
+                                        notesViewModel.onEvent(NoteEvent.RestoreNote)
+                                    }
+
+                                    SnackbarResult.Dismissed -> {}
+                                }
+                            }
+                        }
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.height(16.dp))
+        }
+    }
+}
