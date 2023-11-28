@@ -49,6 +49,7 @@ fun NoteScreen(
     navController: NavController,
     notesViewModel: NotesViewModel = hiltViewModel()
 ) {
+
     val state = notesViewModel.state.value
     val coroutineScope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
